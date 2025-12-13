@@ -1,0 +1,50 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.4
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.4
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  apache:
+    image: httpd:2.4
+    container_name: apache
+    ports:
+      - "8080:80"
+    volumes:
+      - apache_logs:/usr/local/apache2/logs
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+    command: >
+      sh -c "chown -R daemon:daemon /usr/local/apache2/logs && httpd-foreground"
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.4
+    container_name: filebeat
+    user: root
+    command: ["--strict.perms=false"]
+    depends_on:
+      - elasticsearch
+      - kibana
+      - apache
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - apache_logs:/usr/local/apache2/logs:ro
+
+volumes:
+  esdata:
+  apache_logs:
