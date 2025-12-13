@@ -1,0 +1,59 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.4
+    container_name: cat2-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    volumes:
+      - cat2_esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.4
+    container_name: cat2-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  # 🌐 “Dominio/infraestructura del atacante” (T1583.001 Domains)
+  attacker_web:
+    image: httpd:2.4
+    container_name: cat2-attacker-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ./apache/httpd.conf:/usr/local/apache2/conf/httpd.conf:ro
+      - cat2_apache_logs:/usr/local/apache2/logs
+    command: ["sh", "-c", "chown -R root:root /usr/local/apache2/logs && chmod -R 755 /usr/local/apache2/logs && httpd-foreground"]
+
+  # 🛰️ Host interno simulado (genera tráfico)
+  internal_client:
+    image: curlimages/curl:8.6.0
+    container_name: cat2-internal-client
+    command: ["sh", "-c", "sleep infinity"]
+    depends_on:
+      - attacker_web
+
+  # 📥 Filebeat leyendo logs del Apache (módulo apache → ECS)
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.4
+    container_name: cat2-filebeat
+    user: root
+    command: ["--strict.perms=false"]
+    depends_on:
+      - elasticsearch
+      - kibana
+      - attacker_web
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - cat2_apache_logs:/usr/local/apache2/logs:ro
+
+volumes:
+  cat2_esdata:
+  cat2_apache_logs:
