@@ -1,0 +1,10 @@
+filebeat.modules:
+  - module: apache
+    access:
+      enabled: true
+
+output.elasticsearch:
+  hosts: ["http://elasticsearch:9200"]
+
+setup.kibana:
+  host: "http://kibana:5601"
