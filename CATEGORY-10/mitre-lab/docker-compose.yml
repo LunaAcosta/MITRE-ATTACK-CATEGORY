@@ -1,0 +1,41 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.4
+    container_name: cat10-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.4
+    container_name: cat10-kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  ssh_target:
+    image: linuxserver/openssh-server
+    container_name: cat10-ssh-target
+    environment:
+      - USER_NAME=attacker
+      - USER_PASSWORD=password123
+      - PASSWORD_ACCESS=true
+    ports:
+      - "2222:2222"
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.4
+    container_name: cat10-filebeat
+    user: root
+    command: ["--strict.perms=false"]
+    depends_on:
+      - elasticsearch
+      - kibana
+      - ssh_target
+    volumes:
+      - ./filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
